@@ -5,6 +5,7 @@ Fill in data between two dates within by group with non-missing values timeserie
    Five Solutions
 
         1. Optimal solution by Mark Keintz mkeintz@wharton.upenn.edu (set with merge and view option)
+           With additional update
         2. Datastep
         3. Proc Expand
         4. HASH
@@ -151,6 +152,58 @@ preparing data for a time series analysis.
 
 Regards,
 Mark
+
+UPDATE 
+
+Recent Update by Keintz, Mark" <mkeintz@WHARTON.UPENN.EDU>  (flexible, simple and fast)   
+                                                                                          
+If it’s just a matter of filling in holes in a time series, and if the                    
+intermediate values are only a function of the time points immediately                    
+prior and after the hole, (i.e. like si mple carry-forward per this example,              
+or carry-back, or some interpolation between end points), then                            
+I almost always prefer a data step to proc expand.                                        
+Here is a common structure I use -  SET/BY combined                                       
+ with self-merge:                                                                         
+                                                                                          
+data have;                                                                                
+input Account $ Ticker $ Date :mmddyy10. shares Price dollar2.;                           
+format date mmddyy10. Price dollar2.;                                                     
+cards;                                                                                    
+X A 01/01/15 100 $1                                                                       
+X A 01/05/15 200 $2                                                                       
+X B 01/01/15 300 $3                                                                       
+X B 01/05/15 600 $6                                                                       
+run;                                                                                      
+data want (drop=nxt_date);                                                                
+  set have (keep=ticker);                                                                 
+  by ticker;                                                                              
+  merge have                                                                              
+        have (firstobs=2 keep=date rename=(date=nxt_date));                               
+  if last.ticker=0 then do date=date to nxt_date-1;                                       
+    output;                                                                               
+  end;                                                                                    
+  else output;                                                                            
+run;                                                                                      
+                                                                                          
+Note I use the SET statement keeping only the BY-variable.                                
+It's not necessary ignore the other variables, but it reminds                             
+me that I only want the set statement to provide first.ticker                             
+and last.ticker dummies. Then the self merge with a "firstobs=2"                          
+provides all the current-obs data, plus the date the hole is closed.                      
+No retains necessary.  It works to a "t" as long as date are sort                         
+ed by date and/or time within each by-group.  And of course                               
+the BY statement can't be associated with the MERGE statement,                            
+since the "firstobs=2" offset would be eliminated at the start of the 2nd by-group.       
+                                                                                          
+BTW, one of the reasons I prefer this to proc expand is that                              
+proc expand can only new values from univariate series.  That is,                         
+in the data step I could calculate VALUE=SHARES*PRICE.                                    
+You can't do  that in proc expand.                                                        
+Also, unlike proc expand, the data step can generate a view instead of a file -           
+possibly avoiding a lot of disk I/O preparing data for a time series analysis.            
+                                                                                          
+                                                                                          
+
 
 ===========
 2. Datastep
